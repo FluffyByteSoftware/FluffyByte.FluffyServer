@@ -304,7 +304,7 @@ public static class Scribe
             member
         );
 
-        ConsoleColor fg = Console.ForegroundColor;
+        var fg = Console.ForegroundColor;
 
         Console.ForegroundColor = severity switch
         {

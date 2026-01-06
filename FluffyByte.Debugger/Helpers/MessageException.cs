@@ -8,6 +8,15 @@
 
 namespace FluffyByte.Debugger.Helpers;
 
+/// <summary>
+/// Represents an exception object with enhanced details for diagnostic purposes, including:
+/// the exception type, message, stack trace, and inner exception chain (up to 10 levels).
+/// </summary>
+/// <remarks>
+/// This class is primarily used for capturing and formatting exception details in a structured manner.
+/// It encapsulates information from the provided exception, making it suitable for logging or debugging scenarios.
+/// Nested inner exceptions are also represented in a recursive hierarchy within the object.
+/// </remarks>
 public class MessageException
 {
     /// <summary>

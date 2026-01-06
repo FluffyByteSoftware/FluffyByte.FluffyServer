@@ -1,6 +1,6 @@
 ﻿using FluffyByte.Debugger;
 
-namespace FluffyByte.FluffyServer;
+namespace FluffyByte.FluffyServer.Core.Bootstrap;
 
 public static class Program
 {
