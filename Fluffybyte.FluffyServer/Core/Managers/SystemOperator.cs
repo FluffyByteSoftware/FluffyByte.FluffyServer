@@ -43,6 +43,37 @@ public sealed class SystemOperator
 
             Scribe.Debug($"System Operator is now requesting startup of services...");
 
+            // Register Archivist with the global shutdown token for graceful flushing
+            Archivist.RegisterShutdown(ShutdownToken);
+
+            // Start Archivist tick loop in the background
+            _ = Task.Run(async () =>
+            {
+                long tickCount = 0;
+                while (!ShutdownToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await Archivist.Tick(tickCount++);
+                        
+                        // Wait 1 second between ticks (adjust as needed)
+                        await Task.Delay(1000, ShutdownToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected during shutdown
+                        Scribe.Debug("Archivist tick loop cancelled during shutdown.");
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Scribe.Error($"Archivist tick loop encountered error: {ex.Message}", ex);
+                    }
+                }
+                
+                Scribe.Debug("Archivist tick loop has stopped.");
+            }, ShutdownToken);
+
             await _sentinel.RequestStartAsync();
 
             Scribe.Debug($"Sentinel state is now: {_sentinel.State}");

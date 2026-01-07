@@ -16,6 +16,51 @@ public static class Archivist
     
     private const long FlushThresholdBytes = 1024 * 1024 * 35; // 35MB
     private const string LogFilePath = "Logs/Server.log";
+
+    #region Shutdown Management
+
+    private static CancellationTokenRegistration? _shutdownRegistration;
+    private static bool _isShuttingDown;
+
+    /// <summary>
+    /// Registers the Archivist with the system shutdown token to ensure graceful flushing of all
+    /// cached data and logs when shutdown is initiated.
+    /// </summary>
+    /// <param name="shutdownToken">The cancellation token that will be triggered during a system shutdown.</param>
+    public static void RegisterShutdown(CancellationToken shutdownToken)
+    {
+        // This disposes of any existing registration
+        _shutdownRegistration?.Dispose();
+        
+        // Reset shutdown state (in case of restart)
+        _isShuttingDown = false;
+
+        // Register callback for shutdown
+        _shutdownRegistration = shutdownToken.Register(() =>
+        {
+            _isShuttingDown = true;
+            Scribe.Info($"{Name}: Shutdown signal received, initiating emergency flush.");
+
+            try
+            {
+                ShutdownFlush().Wait(shutdownToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown
+                Console.WriteLine($"{Name}: Shutdown flush cancelled.");
+            }
+            catch (Exception ex)
+            {
+                // Last resort error logging
+                Console.WriteLine($"{Name}: CRITICAL - Exception during shutdown flush: {ex}");
+            }
+        });
+
+        Scribe.Info($"{Name}: Registered with system shutdown token.");
+    }
+
+    #endregion Shutdown Management
     
     #region File Cacheing and Buffering
 
@@ -106,7 +151,7 @@ public static class Archivist
             WriteQueue[filePath] = data;
         }
 
-        Scribe.Debug($"{Name}: Queued write for {filePath}");
+        //Scribe.Debug($"{Name}: Queued write for {filePath}");
     }
     #endregion File Cacheing and Buffering
     
@@ -120,6 +165,10 @@ public static class Archivist
     /// callers.</returns>
     public static async Task Tick(long tickCount)
     {
+        // Don't process ticks if we're shutting down - the shutdown handler will flush everything
+        if (_isShuttingDown)
+            return;
+
         try
         {
             // Flush logs from Scribe
@@ -145,7 +194,7 @@ public static class Archivist
     /// <summary>
     /// Immediately flushes all pending writes to disk. Called during system shutdown.
     /// </summary>
-    public static async Task ShutdownFlush()
+    private static async Task ShutdownFlush()
     {
         try
         {
@@ -154,10 +203,8 @@ public static class Archivist
             // Flush logs from Scribe first
             await FlushScribeLogs();
             
-            // Then flush the Archivist's queue
+            // Then flush the Write queue to disk.
             await FlushWriteQueue();
-            
-            Scribe.Info($"{Name}: ShutdownFlush() completed successfully.");
         }
         catch (Exception ex)
         {
@@ -172,29 +219,30 @@ public static class Archivist
     {
         var logData = Scribe.RequestLog();
         
-        if (string.IsNullOrEmpty(logData) || logData.Length == 0)
+        if (logData == null || logData.Length == 0)
             return;
 
         try
         {
-            // Check if our log (Logs/Server.log) file exists, if so append to it
+            // Check if the log file exists, if so append to it
+            // Logs/Server.log
             var existingData = Array.Empty<byte>();
             
             if (File.Exists(LogFilePath))
             {
-                // Read the existing log file
+                // Read an existing log file
                 existingData = await File.ReadAllBytesAsync(LogFilePath);
             }
 
             // Combine existing data with new log data
             var combinedData = new byte[existingData.Length + logData.Length];
             Buffer.BlockCopy(existingData, 0, combinedData, 0, existingData.Length);
-            Buffer.BlockCopy(logData.ToArray(), 0, combinedData, existingData.Length, logData.Length);
+            Buffer.BlockCopy(logData, 0, combinedData, existingData.Length, logData.Length);
 
             // Queue the combined data for writing
             WriteFile(LogFilePath, combinedData);
             
-            Scribe.Debug($"{Name}: Queued {logData.Length} bytes of log data for {LogFilePath}");
+            Console.WriteLine($"{Name}: Queued {logData.Length} bytes of log data for {LogFilePath}");
         }
         catch (Exception ex)
         {
@@ -230,7 +278,7 @@ public static class Archivist
 
                 await File.WriteAllBytesAsync(filePath, data);
 
-                Scribe.Debug($"{Name}: Flush to disk: {filePath}");
+                //Scribe.Debug($"{Name}: Flush to disk: {filePath}");
             }
             catch (OperationCanceledException)
             {
