@@ -6,12 +6,12 @@
  *------------------------------------------------------------
  */
 
-namespace Fluffybyte.FluffyServer.Core.Networking;
+namespace Fluffybyte.FluffyServer.Core.Types;
 
 /// <summary>
 /// Represents the possible states of an operation or a service.
 /// </summary>
-public enum OperationStatus
+public enum FluffyOperationState
 {
     /// <summary>
     /// Indicates that the operation or service is currently stopped.
