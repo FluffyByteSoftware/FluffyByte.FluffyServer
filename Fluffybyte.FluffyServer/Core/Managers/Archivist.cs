@@ -15,6 +15,7 @@ public static class Archivist
     private static readonly string Name = "Archivist";
     
     private const long FlushThresholdBytes = 1024 * 1024 * 35; // 35MB
+    private const string LogFilePath = "Logs/Server.log";
     
     #region File Cacheing and Buffering
 
@@ -121,6 +122,9 @@ public static class Archivist
     {
         try
         {
+            // Flush logs from Scribe
+            await FlushScribeLogs();
+            
             // Check if cache has exceeded maximum allowable size
             var cacheSize = GetCacheSize();
 
@@ -146,12 +150,56 @@ public static class Archivist
         try
         {
             Scribe.Info($"{Name}: ShutdownFlush() initiated.");
+            
+            // Flush logs from Scribe first
+            await FlushScribeLogs();
+            
+            // Then flush the Archivist's queue
             await FlushWriteQueue();
+            
             Scribe.Info($"{Name}: ShutdownFlush() completed successfully.");
         }
         catch (Exception ex)
         {
             Scribe.Error($"{Name}: Exception during ShutdownFlush()", ex);
+        }
+    }
+
+    /// <summary>
+    /// Retrieves buffered log messages from Scribe and appends them to the server log file.
+    /// </summary>
+    private static async Task FlushScribeLogs()
+    {
+        var logData = Scribe.RequestLog();
+        
+        if (string.IsNullOrEmpty(logData) || logData.Length == 0)
+            return;
+
+        try
+        {
+            // Check if our log (Logs/Server.log) file exists, if so append to it
+            var existingData = Array.Empty<byte>();
+            
+            if (File.Exists(LogFilePath))
+            {
+                // Read the existing log file
+                existingData = await File.ReadAllBytesAsync(LogFilePath);
+            }
+
+            // Combine existing data with new log data
+            var combinedData = new byte[existingData.Length + logData.Length];
+            Buffer.BlockCopy(existingData, 0, combinedData, 0, existingData.Length);
+            Buffer.BlockCopy(logData.ToArray(), 0, combinedData, existingData.Length, logData.Length);
+
+            // Queue the combined data for writing
+            WriteFile(LogFilePath, combinedData);
+            
+            Scribe.Debug($"{Name}: Queued {logData.Length} bytes of log data for {LogFilePath}");
+        }
+        catch (Exception ex)
+        {
+            // Can't use Scribe here as it might create a recursive logging situation
+            Console.WriteLine($"{Name}: Exception during FlushScribeLogs: {ex}");
         }
     }
 

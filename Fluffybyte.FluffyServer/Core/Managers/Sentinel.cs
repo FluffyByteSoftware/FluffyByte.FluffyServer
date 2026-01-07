@@ -19,25 +19,23 @@ public sealed class Sentinel : IFluffyOperator
     private string _hostAddress;
     private int _hostPort;
 
-    private SystemOperator Parent;
-    
     public Sentinel(string hostAddress, int hostPort, SystemOperator parent)
     {
         _hostAddress = hostAddress;
         _hostPort = hostPort;
-        Parent = parent;
-        
+
         ShutdownRegistration =
-            CancellationTokenSource.CreateLinkedTokenSource(Parent.ShutdownToken)
+            CancellationTokenSource.CreateLinkedTokenSource(parent.ShutdownToken)
                 .Token.Register(
-                    () => ShutdownInitiated());
+                    ShutdownInitiated);
     }
     
     public async Task RequestStartAsync()
     {
         if (State is not FluffyOperationState.Stopped)
         {
-            
+            Scribe.Critical($"Sentinel was in state: {State} and could not be started.");
+            return;
         }
         
         try
@@ -45,6 +43,10 @@ public sealed class Sentinel : IFluffyOperator
             State = FluffyOperationState.Starting;
 
             Scribe.Debug($"Sentinel is now requesting NetManager to load...");
+
+            State = FluffyOperationState.Running;
+
+            Scribe.Debug($"Sentinel should now be running. State: {State}");
         }
         catch (Exception ex)
         {
@@ -56,7 +58,7 @@ public sealed class Sentinel : IFluffyOperator
 
     private void ShutdownInitiated()
     {
-        
+        // Gracefully shutdown the Net manager?
     }
 }
 

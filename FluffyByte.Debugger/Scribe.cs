@@ -21,8 +21,8 @@ public static class Scribe
     /// </summary>
     public static bool DebugModeEnabled { get; set; } = true;
 
-    private static readonly ConcurrentQueue<MessageEnvelope> _buffer = [];
-    private static readonly int _maxBufferSize = 1000;
+    private static readonly ConcurrentQueue<MessageEnvelope> Buffer = [];
+    private static readonly int MaxBufferSize = 1000;
     
     #region Public Methods
 
@@ -297,21 +297,34 @@ public static class Scribe
         [CallerFilePath] string file = "")
     => CreateEnvelope(MessageSeverity.Critical, message, ex, line, member, file);
     
-    public static string RequestLog()
+    /// <summary>
+    /// Retrieves all buffered log messages, clears the buffer, and returns them as a UTF-8 byte array.
+    /// This method is thread-safe and designed for periodic flushing to disk by the Archivist.
+    /// </summary>
+    /// <returns>A byte array containing all buffered log messages in UTF-8 encoding, or null if the buffer is empty.</returns>
+    public static byte[]? RequestLog()
     {
-        var sb = new StringBuilder();
+        if (Buffer.IsEmpty)
+            return null;
 
-        foreach (var envelope in _buffer)
+        var sb = new StringBuilder();
+        
+        // Drain the queue into the string builder
+        while (Buffer.TryDequeue(out var envelope))
         {
             sb.AppendLine(envelope.ToLogString());
         }
 
-        return sb.ToString();
+        var logText = sb.ToString();
+        return string.IsNullOrEmpty(logText) ? null : Encoding.UTF8.GetBytes(logText);
     }
 
+    /// <summary>
+    /// Clears all buffered log messages. Use with caution as this will discard any unflushed logs.
+    /// </summary>
     public static void ClearBuffer()
     {
-        _buffer.Clear();
+        Buffer.Clear();
     }
     #endregion
 
@@ -358,10 +371,12 @@ public static class Scribe
             _ => ConsoleColor.Blue,
         };
 
-        while (_buffer.Count > _maxBufferSize)
+        while (Buffer.Count > MaxBufferSize)
         {
-            _buffer.TryDequeue(out _);
+            Buffer.TryDequeue(out _);
         }
+
+        Buffer.Enqueue(envelope);
 
         Console.WriteLine(envelope.ToString());
         
@@ -369,7 +384,7 @@ public static class Scribe
 
         if (envelope.Severity == MessageSeverity.Critical)
         {
-            // Would handle a hard shutdown here but how do we pass this to SystemOperator w/o a circular dependency?
+            // Hard shutdown application here?
         }
     }
     #endregion
