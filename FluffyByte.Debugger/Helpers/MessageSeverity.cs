@@ -23,6 +23,12 @@ public enum MessageSeverity
     /// <summary>Error mode message, used for error conditions that indicate a failure in a specific
     /// operation.</summary>
     Error,
+
+    /// <summary>
+    /// Critical mode message, indicating severe or fatal issues that require immediate attention.
+    /// WARNING: CAUSES AN IMMEDIATE SHUTDOWN OF THE APPLICATION.
+    /// </summary>
+    Critical
 }
 
 /*

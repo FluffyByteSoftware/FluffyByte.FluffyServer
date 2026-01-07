@@ -5,8 +5,10 @@
  * Created by - Jacob Chacko
  *------------------------------------------------------------
  */
-using System.Runtime.CompilerServices;
 
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Text;
 using FluffyByte.Debugger.Helpers;
 
 namespace FluffyByte.Debugger;
@@ -18,7 +20,9 @@ public static class Scribe
     /// Useful for debugging.
     /// </summary>
     public static bool DebugModeEnabled { get; set; } = true;
-    
+
+    private static readonly ConcurrentQueue<MessageEnvelope> _buffer = [];
+    private static readonly int _maxBufferSize = 1000;
     
     #region Public Methods
 
@@ -60,7 +64,7 @@ public static class Scribe
     /// member name, and file path.
     /// </summary>
     /// <remarks>This method only writes the message if debug mode is enabled. Caller information is included
-    /// to assist with tracing and diagnostics. The caller info parameters are typically not specified explicitly; they
+    /// to help with tracing and diagnostics. The caller info parameters are typically not specified explicitly; they
     /// are populated by the compiler using the Caller Info attributes.</remarks>
     /// <param name="message">The message to log at the debug level. This should describe the event or state to be
     /// recorded.</param>
@@ -270,6 +274,45 @@ public static class Scribe
         [CallerMemberName] string member = "",
         [CallerFilePath] string file = "")
         => CreateEnvelope(MessageSeverity.Error, message, ex, line, member, file);
+
+    public static void Critical(
+        string message, 
+        [CallerLineNumber] int line = 0, 
+        [CallerMemberName] string member = "", 
+        [CallerFilePath] string file = "")
+    => CreateEnvelope(MessageSeverity.Critical, message, null, line, member, file);
+    
+    public static void Critical(
+        Exception ex,
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "",
+        [CallerFilePath] string file = "")
+    => CreateEnvelope(MessageSeverity.Critical, ex.Message, ex, line, member, file);
+    
+    public static void Critical(
+        string message,
+        Exception ex,
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "",
+        [CallerFilePath] string file = "")
+    => CreateEnvelope(MessageSeverity.Critical, message, ex, line, member, file);
+    
+    public static string RequestLog()
+    {
+        var sb = new StringBuilder();
+
+        foreach (var envelope in _buffer)
+        {
+            sb.AppendLine(envelope.ToLogString());
+        }
+
+        return sb.ToString();
+    }
+
+    public static void ClearBuffer()
+    {
+        _buffer.Clear();
+    }
     #endregion
 
     #region Private Methods
@@ -315,9 +358,19 @@ public static class Scribe
             _ => ConsoleColor.Blue,
         };
 
-        Console.WriteLine(envelope.ToString());
+        while (_buffer.Count > _maxBufferSize)
+        {
+            _buffer.TryDequeue(out _);
+        }
 
+        Console.WriteLine(envelope.ToString());
+        
         Console.ForegroundColor = fg;
+
+        if (envelope.Severity == MessageSeverity.Critical)
+        {
+            // Would handle a hard shutdown here but how do we pass this to SystemOperator w/o a circular dependency?
+        }
     }
     #endregion
 }

@@ -218,6 +218,46 @@ public class MessageEnvelope
 
     #endregion
 
+    public string ToLogString()
+    {
+        var fileName = string.IsNullOrEmpty(SourceFile) 
+            ? "Unknown" 
+            : Path.GetFileName(SourceFile);
+
+        var location = $"{fileName}:{SourceLine} - {Caller}";
+        var timestamp = Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff");
+
+        var sb = new StringBuilder();
+
+        sb.AppendLine($"[ {timestamp} ] [ {location} ] ");
+        sb.AppendLine($"[ {Severity} ] - {Message}");
+
+        if (Exception != null)
+        {
+            var current = Exception;
+            var depth = 0;
+
+            while (current != null && depth < 10)
+            {
+                var indent = new string(' ', depth * 2);
+                
+                sb.AppendLine($"{indent}Exception: {current.Type}");
+                sb.AppendLine($"{indent}Message: {current.Message}");
+
+                if (!string.IsNullOrEmpty(current.StackTrace))
+                {
+                    sb.AppendLine($"{indent}Stack: {current.StackTrace}");
+                }
+                
+                current = current.Inner;
+                depth++;
+            }
+        }
+
+        sb.AppendLine();
+        return sb.ToString();
+    }
+    
     /// <summary>
     /// Returns a formatted string representation of the log entry, including timestamp, severity, message, source
     /// information, and exception details if present.
