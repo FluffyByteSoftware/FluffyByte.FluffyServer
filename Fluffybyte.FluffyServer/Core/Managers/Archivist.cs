@@ -10,6 +10,9 @@ using FluffyByte.Debugger;
 
 namespace Fluffybyte.FluffyServer.Core.Managers;
 
+/// <summary>
+/// Acts as our primary disk manager; loading files from and to disk.
+/// </summary>
 public static class Archivist
 {
     private static readonly string Name = "Archivist";

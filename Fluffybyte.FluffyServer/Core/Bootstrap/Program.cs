@@ -1,37 +1,63 @@
-﻿using System.Text;
+/*
+ * (Program.cs)
+ *------------------------------------------------------------
+ * Created - Thursday, January 8, 2026@12:22:27 AM
+ * Created by - Jacob Chacko
+ *------------------------------------------------------------
+ */
+
 using FluffyByte.Debugger;
 using Fluffybyte.FluffyServer.Core.Managers;
 
-namespace FluffyByte.FluffyServer.Core.Bootstrap;
+namespace Fluffybyte.FluffyServer.Core.Bootstrap;
 
 public static class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
-        var sysOp = new SystemOperator("10.0.0.83", 9997);
-
-        sysOp.RequestStartAsync().Wait();
-
-        Scribe.Info("Should have started successfully...");
-
-        Scribe.Info($"{sysOp.State} is the current state of sys op.");
-
-        var fileRead = Archivist.ReadFile($@"E:\Temp\test.txt");
-
-        if (fileRead == null || fileRead.Length == 0)
+        var hostAddress = "10.0.0.84";
+        var hostPort = 9997;
+        
+        for (var i = 0; i < args.Length; i++)
         {
-            Scribe.Warn("File was not found or file contents were not properly translated.");
+            switch (args[i])
+            {
+                case "-ip":
+                {
+                    var possibleIp = args[i + 1];
+                
+                    if(possibleIp.Contains('.'))
+                        hostAddress = args[i + 1];
+                    else 
+                        Scribe.Warn($"Invalid IP Address: {possibleIp}");
+                    break;
+                }
+                case "-port" when int.TryParse(args[i + 1], out var parsedPort):
+                    hostPort = parsedPort;
+                    break;
+                case "-port":
+                    Scribe.Warn($"Invalid Port: {args[i + 1]}");
+                    break;
+            }
         }
-        else
-        {
-            var fileContents = Encoding.UTF8.GetString(fileRead);
-            Console.WriteLine(fileContents);
-            
-            Scribe.DisplayFileContents(fileContents);
-        }
+        Scribe.Info($"Host Address: {hostAddress} -port {hostPort}");
+        
+        CourtMaster.Initialize(hostAddress, hostPort);
+        Archivist.RegisterShutdown(CourtMaster.ShutdownToken);
 
         Console.ReadLine();
         
-        sysOp.RequestStopAsync().Wait();
+        CourtMaster.Shutdown();
+
+        Scribe.Info("Server shutdown complete.");
+
+        await Task.CompletedTask;
     }
 }
+
+/*
+ *------------------------------------------------------------
+ * (Program.cs)
+ * See License.txt for licensing information.
+ *-----------------------------------------------------------
+ */

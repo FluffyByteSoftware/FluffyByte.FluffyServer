@@ -7,7 +7,6 @@
  */
 
 using System.Collections.Concurrent;
-using System.Net.Mime;
 using System.Runtime.CompilerServices;
 using System.Text;
 using FluffyByte.Debugger.Helpers;
@@ -22,8 +21,8 @@ public static class Scribe
     /// </summary>
     public static bool DebugModeEnabled { get; set; } = true;
 
-    private static readonly ConcurrentQueue<MessageEnvelope> _buffer = [];
-    private static readonly int _maxBufferSize = 1000;
+    private static readonly ConcurrentQueue<MessageEnvelope> Buffer = [];
+    private static readonly int MaxBufferSize = 1000;
     
     #region Public Methods
 
@@ -305,13 +304,13 @@ public static class Scribe
     /// <returns>A byte array containing all buffered log messages in UTF-8 encoding, or null if the buffer is empty.</returns>
     public static byte[]? RequestLog()
     {
-        if (_buffer.IsEmpty)
+        if (Buffer.IsEmpty)
             return null;
 
         var sb = new StringBuilder();
         
         // Drain the queue into the string builder
-        while (_buffer.TryDequeue(out var envelope))
+        while (Buffer.TryDequeue(out var envelope))
         {
             sb.AppendLine(envelope.ToLogString());
         }
@@ -325,7 +324,7 @@ public static class Scribe
     /// </summary>
     public static void ClearBuffer()
     {
-        _buffer.Clear();
+        Buffer.Clear();
     }
     #endregion
 
@@ -372,12 +371,12 @@ public static class Scribe
             _ => ConsoleColor.Blue,
         };
 
-        while (_buffer.Count > _maxBufferSize)
+        while (Buffer.Count > MaxBufferSize)
         {
-            _buffer.TryDequeue(out _);
+            Buffer.TryDequeue(out _);
         }
 
-        _buffer.Enqueue(envelope);
+        Buffer.Enqueue(envelope);
 
         Console.WriteLine(envelope.ToString());
         
