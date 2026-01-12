@@ -91,19 +91,23 @@ public class FluffyShell
         // Format: ESC[6n
         // Terminal responds with: ESC[{row};{col}R
     
-        var _stream = _client.GetStream();
+        var stream = _client.GetStream();
         var sw = System.Diagnostics.Stopwatch.StartNew();
     
-        _stream.Write(Encoding.ASCII.GetBytes("\e[6n"));
-        _stream.Flush();
+        stream.Write(Encoding.ASCII.GetBytes("\e[6n"));
+        stream.Flush();
     
         // Read response: ESC[##;##R
         StringBuilder response = new();
         while (true)
         {
-            int b = _stream.ReadByte();
-            if (b == -1) break;
+            var b = stream.ReadByte();
+            
+            if (b == -1) 
+                break;
+            
             response.Append((char)b);
+            
             if ((char)b == 'R') break; // End of response
         }
     

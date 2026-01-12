@@ -24,16 +24,6 @@ public enum FluffyOperationState
     Starting,
 
     /// <summary>
-    /// Indicates that the operation or service is currently running.
-    /// </summary>
-    Running,
-
-    /// <summary>
-    /// Indicates that the operation or service is in the process of stopping.
-    /// </summary>
-    Stopping,
-
-    /// <summary>
     /// Indicates that the operation or service encountered an error or failure.
     /// </summary>
     Error

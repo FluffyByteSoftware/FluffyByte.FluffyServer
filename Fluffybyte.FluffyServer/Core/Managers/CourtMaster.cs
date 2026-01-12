@@ -7,6 +7,7 @@
  */
 
 using FluffyByte.Debugger;
+using Fluffybyte.FluffyServer.Core.Managers.Networking;
 
 namespace Fluffybyte.FluffyServer.Core.Managers;
 
@@ -33,6 +34,8 @@ public static class CourtMaster
             _shutdownTokenSource = new CancellationTokenSource();
             ShutdownToken = _shutdownTokenSource.Token;
 
+            Sentinel.Watch(hostAddress, hostPort);
+            
             _initialized = true;
         }
         catch (Exception ex)
@@ -58,7 +61,7 @@ public static class CourtMaster
             ShutdownToken = CancellationToken.None;
             
             Scribe.Info("Shutdown operation initiated. Initiating server shutdown sequence...");
-
+            
             _initialized = false;
             Scribe.Info($"The CourtMaster has shut operations down.");
         }
