@@ -85,46 +85,30 @@ public class FluffyShell
         }
     }
 
-    public async Task<int> PingAsync()
+    public int MeasureTerminalLatency()
     {
-        try
+        // Send a cursor position query (ANSI escape sequence)
+        // Format: ESC[6n
+        // Terminal responds with: ESC[{row};{col}R
+    
+        var _stream = _client.GetStream();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+    
+        _stream.Write(Encoding.ASCII.GetBytes("\e[6n"));
+        _stream.Flush();
+    
+        // Read response: ESC[##;##R
+        StringBuilder response = new();
+        while (true)
         {
-            var stream = _client.GetStream();
-
-            // Send ping timestamp
-            var sendTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var pingData = BitConverter.GetBytes(sendTime);
-
-            await stream.WriteAsync(pingData, CourtMaster.ShutdownToken);
-            await stream.FlushAsync(CourtMaster.ShutdownToken);
-
-            // Wait for echo response
-            var buffer = new byte[8];
-            var bytesRead = await stream.ReadAsync(buffer, CourtMaster.ShutdownToken);
-
-            if (bytesRead != 8)
-                return -1;
-
-            var receiveTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var echoedTime = BitConverter.ToInt64(buffer);
-
-            // Verify it's our timestamp
-            if (echoedTime != sendTime)
-                return -1;
-
-            Latency = (int)(receiveTime - sendTime);
-            return Latency;
+            int b = _stream.ReadByte();
+            if (b == -1) break;
+            response.Append((char)b);
+            if ((char)b == 'R') break; // End of response
         }
-        catch (OperationCanceledException)
-        {
-            // Expected during shutdown
-            return -1;
-        }
-        catch (Exception ex)
-        {
-            Scribe.Error(ex);
-            return -1;
-        }
+    
+        sw.Stop();
+        return Latency = (int)sw.ElapsedMilliseconds;
     }
 }
 
