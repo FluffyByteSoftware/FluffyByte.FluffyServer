@@ -11,6 +11,7 @@ using System.Net.Sockets;
 using System.Text;
 using FluffyByte.Debugger;
 using Fluffybyte.FluffyServer.Core.Managers.Networking.Tcp;
+using Fluffybyte.FluffyServer.Core.Types;
 
 namespace Fluffybyte.FluffyServer.Core.Managers.Networking;
 
@@ -19,12 +20,18 @@ public static class Sentinel
     private const string Name = "Sentinel";
     private static TcpListener? _listener;
     private static bool _active;
-    private static Lock _lock = new();
-
+    private static readonly Lock Lock = new();
+    private static FluffyOperationState _state = FluffyOperationState.Stopped;
     
     public static void Watch(string address, int port)
     {
-        lock (_lock)
+        if (_state != FluffyOperationState.Stopped)
+        {
+            Scribe.Critical($"{Name}: Already running or errored.  Please check the log.");
+            return;
+        }
+        
+        lock (Lock)
         {
             if (_active) return;
             
@@ -40,6 +47,8 @@ public static class Sentinel
 
             Scribe.Info($"{Name}: Vigil started on port {port}.  The gates are open.");
 
+            _state = FluffyOperationState.Started;
+            
             // Begin the asynchronous acceptance loop
             _ = Task.Run(AcceptLoop, CourtMaster.ShutdownToken);
         }
@@ -64,7 +73,7 @@ public static class Sentinel
 
                 Scribe.Debug($"A new client has arrived.");
 
-                var fs = new FluffyShell(client);
+                var fs = new Dust(client);
 
                 const string helloWorld = "Hello World!";
                 
@@ -85,7 +94,8 @@ public static class Sentinel
             }
             catch (Exception ex)
             {
-                Scribe.Error(ex);
+                if(!CourtMaster.ShutdownToken.IsCancellationRequested)
+                    Scribe.Error(ex);
             }
         }
 
@@ -94,12 +104,28 @@ public static class Sentinel
 
     private static void Stop()
     {
-        lock (_lock)
+        if (_state is not FluffyOperationState.Started)
         {
-            _active = false;
-            _listener?.Stop();
-            
-            Scribe.Info($"{Name}: The Sentinel has closed the gates.");
+            Scribe.Warn($"{Name}: is not running but was asked to stop.");
+            return;
+        }
+
+        try
+        {
+            lock (Lock)
+            {
+                _active = false;
+                _listener?.Stop();
+
+                Scribe.Info($"{Name}: The Sentinel has closed the gates.");
+
+                _state = FluffyOperationState.Stopped;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!CourtMaster.ShutdownToken.IsCancellationRequested)
+                Scribe.Error(ex);
         }
     }
 }

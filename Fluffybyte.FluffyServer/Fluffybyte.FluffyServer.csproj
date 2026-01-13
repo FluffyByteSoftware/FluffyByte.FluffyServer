@@ -15,4 +15,8 @@
       <PackageReference Include="LiteNetLib" Version="1.3.5" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Core\Managers\Networking\Udp\" />
+    </ItemGroup>
+
 </Project>

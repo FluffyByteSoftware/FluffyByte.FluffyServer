@@ -21,7 +21,7 @@ public enum FluffyOperationState
     /// <summary>
     /// Indicates that the operation or service is in the process of starting.
     /// </summary>
-    Starting,
+    Started,
 
     /// <summary>
     /// Indicates that the operation or service encountered an error or failure.
